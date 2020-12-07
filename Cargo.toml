@@ -1,0 +1,10 @@
+[package]
+name = "ray_tracer_renderer"
+version = "0.1.0"
+authors = ["Anthony Beninati <abeninati01@manhattan.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+auto_ops = "0.1.0"
