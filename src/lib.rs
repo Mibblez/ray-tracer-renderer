@@ -12,7 +12,7 @@ pub mod ray_tracer_utilities {
         pub x: f64,
         pub y: f64,
         pub z: f64,
-        w: f64,
+        pub w: f64,
     }
 
     impl fmt::Display for Vec4 {
@@ -675,6 +675,217 @@ pub mod ray_tracer_utilities {
 									153 255 204 153 255 204 153 255 204 153 255 204 153\n\
 									255 204 153 255 204 153 255 204 153 255 204 153 255 204 153 255 204\n\
 									153 255 204 153 255 204 153 255 204 153 255 204 153\n");
+        }
+    }
+}
+
+pub mod matrices {
+    use auto_ops::impl_op_ex;
+    use super::ray_tracer_utilities::Vec4;
+    //use super::ray_tracer_utilities::equal_approx;
+
+    macro_rules! build_mat {
+        ($mat_name:ident, $size:expr) => (
+            #[derive(Copy, Clone, Debug)]
+            pub struct $mat_name {
+                pub data: [[f64;$size];$size],
+            }
+
+            impl $mat_name {
+            // Not sure why functions here are being marked as dead code
+                #[allow(dead_code)]
+                pub fn new(data: [[f64;$size]; $size]) -> $mat_name {
+                    $mat_name { data }
+                }
+
+                #[allow(dead_code)]
+                pub fn zeros() -> $mat_name {
+                    $mat_name { data: [[0.0 ; $size] ; $size] }
+                }
+            }
+
+            impl PartialEq for $mat_name {
+                fn eq(&self, other: &Self) -> bool {
+                    self.data == other.data
+                }
+            }
+        )
+    }
+
+    build_mat!(Mat4, 4);
+    build_mat!(Mat3, 3);
+    build_mat!(Mat2, 2);
+
+    // Multiplication for mat4
+    impl_op_ex!(* |a: &Mat4, b: &Mat4| -> Mat4 {
+        let mut m = Mat4::zeros();
+
+        for row in 0..4 {
+            for col in 0..4 {
+                m.data[row][col] = a.data[row][0] * b.data[0][col] +
+                                   a.data[row][1] * b.data[1][col] +
+                                   a.data[row][2] * b.data[2][col] +
+                                   a.data[row][3] * b.data[3][col];
+            }
+        }
+        m
+    });
+
+    // Multiplication for mat4 * vec4
+    impl_op_ex!(* |a: &Mat4, b: &Vec4| -> Vec4 {
+        let mut vec4_values: [f64; 4] = [0.0; 4];
+
+        for row in 0..4 {
+            vec4_values[row] = a.data[row][0] * b.x +
+                               a.data[row][1] * b.y +
+                               a.data[row][2] * b.z +
+                               a.data[row][3] * b.w;
+        }
+
+        Vec4::new_vec4(vec4_values[0], vec4_values[1], vec4_values[2], vec4_values[3])
+    });
+
+    #[cfg(test)]
+    mod matrix_tests {
+        use super::*;
+
+        #[test]
+        fn create_mat() {
+            let m4 = Mat4::new([
+                [1.0, 2.0, 3.0, 4.0],
+                [5.5, 6.5, 7.5, 8.5],
+                [9.0, 10.0, 11.0, 12.0],
+                [13.5, 14.5, 15.5, 16.5]]);
+
+            assert_eq!(m4.data[0][0], 1.0);
+            assert_eq!(m4.data[0][3], 4.0);
+            assert_eq!(m4.data[1][0], 5.5);
+            assert_eq!(m4.data[1][2], 7.5);
+            assert_eq!(m4.data[2][2], 11.0);
+            assert_eq!(m4.data[3][2], 15.5);
+
+            let m4_zeros = Mat4::zeros();
+
+            let mut m4_count = 0;
+            // Iterate over mat4 values
+            for i in m4_zeros.data.iter() {
+                for j in i.iter() {
+                    assert_eq!(*j, 0.0);
+                    m4_count += 1;
+                }
+            }
+
+            // Ensure that mat4 contains the correct number of elements
+            assert_eq!(m4_count, 16);
+
+            let m3 = Mat3::new([
+                [-3.0, 5.0, 0.0],
+                [1.0, -2.0, -7.0],
+                [0.0, 1.0, 1.0]]);
+            assert_eq!(m3.data[0][0], -3.0);
+            assert_eq!(m3.data[1][1], -2.0);
+            assert_eq!(m3.data[2][2], 1.0);
+
+            let m3_zeros = Mat3::zeros();
+
+            let mut m3_count = 0;
+            // Iterate over mat3 values
+            for i in m3_zeros.data.iter() {
+                for j in i.iter() {
+                    assert_eq!(*j, 0.0);
+                    m3_count += 1
+                }
+            }
+
+            // Ensure that mat3 contains the correct number of elements
+            assert_eq!(m3_count, 9);
+
+            let m2 = Mat2::new([
+                [-3.0, 5.0],
+                [1.0, -2.0]]);
+
+            assert_eq!(m2.data[0][0], -3.0);
+            assert_eq!(m2.data[0][1], 5.0);
+            assert_eq!(m2.data[1][0], 1.0);
+            assert_eq!(m2.data[1][1], -2.0);
+
+            let m2_zeros = Mat2::zeros();
+
+            let mut m2_count = 0;
+            // Iterate over mat3 values
+            for i in m2_zeros.data.iter() {
+                for j in i.iter() {
+                    assert_eq!(*j, 0.0);
+                    m2_count += 1
+                }
+            }
+
+            // Ensure that mat4 contains the correct number of elements
+            assert_eq!(m2_count, 4);
+        }
+
+        #[test]
+        fn matrix_equality() {
+            let m4_1 = Mat4::zeros();
+            let m4_2 = Mat4::zeros();
+            let m4_3 = Mat4::new([[1.0, 2.0, 3.0, 4.0],
+                [5.5, 6.5, 7.5, 8.5],
+                [9.0, 10.0, 11.0, 12.0],
+                [13.5, 14.5, 15.5, 16.5]]);
+            let m4_4 = Mat4::new([[1.0, 2.0, 3.0, 4.0],
+                [5.5, 6.5, 7.5, 8.5],
+                [9.0, 10.0, 11.0, 12.0],
+                [13.5, 14.5, 15.5, 16.5]]);
+
+            assert_eq!(m4_1, m4_2);
+            assert_ne!(m4_1, m4_3);
+            assert_eq!(m4_4, m4_4);
+        }
+
+        #[test]
+        fn modify_mat() {
+            let mut m_mut = Mat4::zeros();
+            m_mut.data[0][1] = 1.0;
+            m_mut.data[2][3] = 3.5;
+
+            assert_eq!(m_mut.data[0][1], 1.0);
+            assert_eq!(m_mut.data[2][3], 3.5);
+        }
+
+        #[test]
+        fn mat4_multiplication() {
+            let m1 = Mat4::new([
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 8.0, 7.0, 6.0],
+                [5.0, 4.0, 3.0, 2.0]]);
+
+            let m2 = Mat4::new([
+                [-2.0, 1.0, 2.0, 3.0],
+                [3.0, 2.0, 1.0, -1.0],
+                [4.0, 3.0, 6.0, 5.0],
+                [1.0, 2.0, 7.0, 8.0]]);
+
+            let m3 = Mat4::new([
+                [20.0, 22.0, 50.0, 48.0],
+                [44.0, 54.0, 114.0, 108.0],
+                [40.0, 58.0, 110.0, 102.0],
+                [16.0, 26.0, 46.0, 42.0]]);
+
+            assert_eq!(m1 * m2, m3);
+        }
+
+        #[test]
+        fn mat4_multiplication_with_vec4() {
+            let m = Mat4::new([
+                [1.0, 2.0, 3.0, 4.0],
+                [2.0, 4.0, 4.0, 2.0],
+                [8.0, 6.0, 4.0, 1.0],
+                [0.0, 0.0, 0.0, 1.0]]);
+
+            let v = Vec4::new_vec4(1.0, 2.0, 3.0, 1.0);
+
+            assert_eq!(m * v, Vec4::new_vec4(18.0, 24.0, 33.0, 1.0))
         }
     }
 }

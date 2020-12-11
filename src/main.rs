@@ -29,7 +29,6 @@ fn main() {
 
 	let mut file = std::fs::File::create("test_image.ppm").expect("create failed");
 	file.write_all(ppm.as_bytes()).expect("write failed");
-
 }
 
 
