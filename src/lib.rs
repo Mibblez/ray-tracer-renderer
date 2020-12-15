@@ -682,7 +682,8 @@ pub mod ray_tracer_utilities {
 pub mod matrices {
     use auto_ops::impl_op_ex;
     use super::ray_tracer_utilities::Vec4;
-    //use super::ray_tracer_utilities::equal_approx;
+    use std::ops::Neg;
+    use super::ray_tracer_utilities::equal_approx;
 
     macro_rules! build_mat {
         ($mat_name:ident, $size:expr) => (
@@ -701,6 +702,32 @@ pub mod matrices {
                 #[allow(dead_code)]
                 pub fn zeros() -> $mat_name {
                     $mat_name { data: [[0.0 ; $size] ; $size] }
+                }
+
+                #[allow(dead_code)]
+                pub fn transposed(&self) -> $mat_name {
+                    let mut m_tmp = $mat_name::zeros();
+
+                    for row in 0..$size {
+                        for col in 0..$size {
+                            m_tmp.data[row][col] = self.data[col][row];
+                        }
+                    }
+
+                    m_tmp
+                }
+
+                #[allow(dead_code)]
+                pub fn equal_approx(&self, other: &$mat_name) -> bool {
+                    for row in 0..$size {
+                        for col in 0..$size {
+                            if !equal_approx(self.data[row][col], other.data[row][col]) {
+                                return false;
+                            }
+                        }
+                    }
+
+                    true
                 }
             }
 
@@ -744,6 +771,121 @@ pub mod matrices {
 
         Vec4::new_vec4(vec4_values[0], vec4_values[1], vec4_values[2], vec4_values[3])
     });
+
+    impl Mat4 {
+        pub fn id() -> Mat4 {
+            Mat4::new([[1.0, 0.0, 0.0, 0.0],
+                          [0.0, 1.0, 0.0, 0.0],
+                          [0.0, 0.0, 1.0, 0.0],
+                          [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn submatrix(&self, row_to_exclude: usize, col_to_exclude: usize) -> Mat3 {
+            if row_to_exclude > 3 || col_to_exclude > 3 {
+                panic!("index out of bounds: cannot exclude a row or col that does not exist");
+            }
+
+            let mut m_values: Vec<f64> = Vec::with_capacity(9);
+
+            for row in 0..4 {
+                if row != row_to_exclude {
+                    for col in 0..4 {
+                        if col != col_to_exclude {
+                            m_values.push(self.data[row][col]);
+                        }
+                    }
+                }
+            }
+
+            Mat3::new([[m_values[0],m_values[1], m_values[2]],
+                             [m_values[3],m_values[4], m_values[5]],
+                             [m_values[6],m_values[7], m_values[8]]])
+        }
+
+        pub fn minor(&self, row: usize, col: usize) -> f64 {
+            self.submatrix(row, col).determinant()
+        }
+
+        pub fn cofactor(&self, row: usize, col: usize) -> f64 {
+            if (row + col) % 2 == 0 {
+                self.minor(row, col)
+            } else {
+                self.minor(row, col).neg()
+            }
+        }
+
+        pub fn determinant(&self) -> f64 {
+            self.data[0][0] * self.cofactor(0,0) +
+                self.data[0][1] * self.cofactor(0, 1) +
+                self.data[0][2] * self.cofactor(0, 2) +
+                self.data[0][3] * self.cofactor(0, 3)
+        }
+
+        pub fn inverted(&self) -> Mat4 {
+            let det = self.determinant();
+            if det == 0.0 {
+                // TODO: better error handling
+                panic!("matrix has a determinant of 0. It cannot be inverted");
+            }
+
+            let mut m_tmp = Mat4::zeros();
+            for row in 0..4 {
+                for col in 0..4 {
+                    m_tmp.data[col][row] = self.cofactor(row, col) / det;
+                }
+            }
+
+            m_tmp
+        }
+
+    }
+
+    impl Mat3 {
+        pub fn submatrix(&self, row_to_exclude: usize, col_to_exclude: usize) -> Mat2 {
+            if row_to_exclude > 2 || col_to_exclude > 2 {
+                panic!("index out of bounds: cannot exclude a row or col that does not exist");
+            }
+
+            let mut m_values: Vec<f64> = Vec::with_capacity(4);
+
+            for row in 0..3 {
+                if row != row_to_exclude {
+                    for col in 0..3 {
+                        if col != col_to_exclude {
+                            m_values.push(self.data[row][col]);
+                        }
+                    }
+                }
+            }
+
+            Mat2::new([[m_values[0],m_values[1]],
+                             [m_values[2],m_values[3]]])
+        }
+
+        pub fn minor(&self, row: usize, col: usize) -> f64 {
+            self.submatrix(row,col).determinant()
+        }
+
+        pub fn cofactor(&self, row: usize, col: usize) -> f64 {
+            if (row + col) % 2 == 0 {
+                self.minor(row, col)
+            } else {
+                self.minor(row, col).neg()
+            }
+        }
+
+        pub fn determinant(&self) -> f64 {
+            self.data[0][0] * self.cofactor(0,0) +
+                self.data[0][1] * self.cofactor(0, 1) +
+                self.data[0][2] * self.cofactor(0, 2)
+        }
+    }
+
+    impl Mat2 {
+        pub fn determinant(&self) -> f64 {
+            (self.data[0][0] * self.data[1][1]) - (self.data[0][1] * self.data[1][0])
+        }
+    }
 
     #[cfg(test)]
     mod matrix_tests {
@@ -886,6 +1028,162 @@ pub mod matrices {
             let v = Vec4::new_vec4(1.0, 2.0, 3.0, 1.0);
 
             assert_eq!(m * v, Vec4::new_vec4(18.0, 24.0, 33.0, 1.0))
+        }
+
+        #[test]
+        fn transposed() {
+            let a = Mat4::new([
+                [0.0, 9.0, 3.0, 0.0],
+                [9.0, 8.0, 0.0, 8.0],
+                [1.0, 8.0, 5.0, 3.0],
+                [0.0, 0.0, 5.0, 8.0]]);
+
+            let b = Mat4::new([
+                [0.0, 9.0, 1.0, 0.0],
+                [9.0, 8.0, 8.0, 0.0],
+                [3.0, 0.0, 5.0, 5.0],
+                [0.0, 8.0, 3.0, 8.0]]);
+
+            assert_eq!(a.transposed(), b);
+
+            // Inverting the identity matrix should produce the identity matrix
+            let id = Mat4::id();
+            assert_eq!(id, id.transposed());
+
+        }
+
+        #[test]
+        fn submatrix() {
+            let m3 = Mat3::new([
+                [1.0, 5.0, 0.0],
+                [-3.0, 2.0, 7.0],
+                [0.0, 6.0, -3.0]]);
+
+            let a = Mat2::new([[-3.0, 2.0],
+                                            [0.0, 6.0]]);
+
+            let sub_m3 = m3.submatrix(0, 2);
+
+            assert_eq!(sub_m3, a);
+        }
+
+        #[test]
+        fn minor() {
+            let a1 = Mat3::new([
+                [3.0, 5.0, 0.0],
+                [2.0, -1.0, -7.0],
+                [6.0, -1.0, 5.0]]);
+
+            let b1 = a1.submatrix(1, 0);
+
+            assert_eq!(a1.minor(1, 0), b1.determinant());
+
+            let a2 = Mat4::new([
+                [3.0, 5.0, 0.0, 1.0],
+                [2.0, -1.0, -7.0, 3.0],
+                [6.0, -1.0, 5.0, -2.0],
+                [6.0, -1.0, 5.0, -2.0]]);
+
+            let b2 = a2.submatrix(1, 0);
+
+            assert_eq!(a2.minor(1, 0), b2.determinant());
+        }
+
+        #[test]
+        fn cofactor() {
+            let a1 = Mat3::new([
+                [3.0, 5.0, 0.0],
+                [2.0, -1.0, -7.0],
+                [6.0, -1.0, 5.0]]);
+
+            assert_eq!(a1.minor(0, 0), -12.0);
+            assert_eq!(a1.cofactor(0, 0), -12.0);
+            assert_eq!(a1.minor(1, 0), 25.0);
+            assert_eq!(a1.cofactor(1, 0), -25.0);
+
+            let a2 = Mat4::new([
+                [3.0, 5.0, 0.0, 1.0],
+                [2.0, -1.0, -7.0, 2.0],
+                [8.0, -1.0, 5.0, -2.0],
+                [6.0, -1.0, 9.0, 10.0]]);
+
+            assert_eq!(a2.minor(0, 0), -160.0);
+            assert_eq!(a2.cofactor(0, 0), -160.0);
+            assert_eq!(a2.minor(1, 0), 336.0);
+            assert_eq!(a2.cofactor(1, 0), -336.0);
+        }
+
+        #[test]
+        fn determinant() {
+            let a1 = Mat2::new([
+                                    [1.0, 5.0],
+                                    [-3.0, 2.0]]);
+
+            assert_eq!(a1.determinant(), 17.0);
+
+            let a2 = Mat3::new([
+                [1.0, 2.0, 6.0],
+                [-5.0, 8.0, -4.0],
+                [2.0, 6.0, 4.0]]);
+
+            assert_eq!(a2.cofactor(0, 0), 56.0);
+            assert_eq!(a2.cofactor(0, 1), 12.0);
+            assert_eq!(a2.cofactor(0, 2), -46.0);
+            assert_eq!(a2.determinant(), -196.0);
+
+            let a3 = Mat4::new([
+                [-2.0, -8.0, 3.0, 5.0],
+                [-3.0, 1.0, 7.0, 3.0],
+                [1.0, 2.0, -9.0, 6.0],
+                [-6.0, 7.0, 7.0, -9.0]]);
+
+            assert_eq!(a3.cofactor(0, 0), 690.0);
+            assert_eq!(a3.cofactor(0, 1), 447.0);
+            assert_eq!(a3.cofactor(0, 2), 210.0);
+            assert_eq!(a3.cofactor(0, 3), 51.0);
+            assert_eq!(a3.determinant(), -4071.0);
+        }
+
+        #[test]
+        fn inversion() {
+        let a = Mat4::new([
+                [-5.0, 2.0, 6.0, -8.0],
+                [1.0, -5.0, 1.0, 8.0],
+                [7.0, 7.0, -6.0, -7.0],
+                [1.0, -3.0, 7.0, 4.0]]);
+        let a_inv = Mat4::new([
+                [0.21805, 0.45113, 0.24060, -0.04511],
+                [-0.80827, -1.45677, -0.44361, 0.52068],
+                [-0.07895, -0.22368, -0.05263, 0.19737],
+                [-0.52256, -0.81391, -0.30075, 0.30639]]);
+        let b = a.inverted();
+
+        assert_eq!(a.determinant(), 532.0);
+
+        assert_eq!(a.cofactor(2, 3), -160.0);
+        assert_eq!(b.data[3][2], -160.0/532.0);
+        assert_eq!(a.cofactor(3, 2), 105.0);
+        assert_eq!(b.data[2][3], 105.0/532.0);
+
+        assert_eq!(b.equal_approx(&a_inv), true);
+        }
+
+        #[test]
+        fn inversion_multiplication() {
+            let a = Mat4::new([
+                    [-3.0, 9.0, 7.0, 3.0],
+                    [3.0, -8.0, 2.0, -9.0],
+                    [-4.0, 4.0, 4.0, 1.0],
+                    [-6.0, 5.0, -1.0, 1.0]]);
+
+            let b = Mat4::new([
+                    [8.0, 2.0, 2.0, 2.0],
+                    [3.0, -1.0, 7.0, 0.0],
+                    [7.0, 0.0, 5.0, 4.0],
+                    [6.0, -2.0, 0.0, 5.0]]);
+
+            let c = a * b;
+            assert_eq!((c * b.inverted()).equal_approx(&a), true);
         }
     }
 }
