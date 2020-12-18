@@ -105,9 +105,9 @@ pub mod ray_tracer_utilities {
 
         pub fn equal_approx(&self, other: &Vec4) -> bool {
             equal_approx(self.x, other.x) &&
-            equal_approx(self.y, other.y) &&
-            equal_approx(self.z, other.z) &&
-            equal_approx(self.w, other.w)
+                equal_approx(self.y, other.y) &&
+                equal_approx(self.z, other.z) &&
+                equal_approx(self.w, other.w)
         }
 
         pub fn magnitude(&self) -> f64 {
@@ -787,46 +787,70 @@ pub mod matrices {
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn translation(x: f64, y: f64, z: f64) -> Mat4 {
+        pub fn new_translation(x: f64, y: f64, z: f64) -> Mat4 {
             Mat4::new([[1.0, 0.0, 0.0, x],
                 [0.0, 1.0, 0.0, y],
                 [0.0, 0.0, 1.0, z],
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn scaling(x: f64, y: f64, z: f64) -> Mat4 {
+        pub fn new_scaling(x: f64, y: f64, z: f64) -> Mat4 {
             Mat4::new([[x, 0.0, 0.0, 0.0],
                 [0.0, y, 0.0, 0.0],
                 [0.0, 0.0, z, 0.0],
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn rotation_x(r: f64) -> Mat4 {
+        pub fn new_rotation_x(r: f64) -> Mat4 {
             Mat4::new([[1.0, 0.0, 0.0, 0.0],
                 [0.0, r.cos(), -r.sin(), 0.0],
                 [0.0, r.sin(), r.cos(), 0.0],
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn rotation_y(r: f64) -> Mat4 {
+        pub fn new_rotation_y(r: f64) -> Mat4 {
             Mat4::new([[r.cos(), 0.0, r.sin(), 0.0],
                 [0.0, 1.0, 0.0, 0.0],
                 [-r.sin(), 0.0, r.cos(), 0.0],
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn rotation_z(r: f64) -> Mat4 {
+        pub fn new_rotation_z(r: f64) -> Mat4 {
             Mat4::new([[r.cos(), -r.sin(), 0.0, 0.0],
                 [r.sin(), r.cos(), 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0]])
         }
 
-        pub fn shearing(xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Mat4 {
+        pub fn new_shearing(xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Mat4 {
             Mat4::new([[1.0, xy, xz, 0.0],
                 [yx, 1.0, yz, 0.0],
                 [zx, zy, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn translate(&self, x: f64, y: f64, z: f64) -> Mat4 {
+            self * Mat4::new_translation(x, y, z)
+        }
+
+        pub fn scale(&self, x: f64, y: f64, z: f64) -> Mat4 {
+            self * Mat4::new_scaling(x, y, z)
+        }
+
+        pub fn rotate_x(&self, r: f64) -> Mat4 {
+            self * Mat4::new_rotation_x(r)
+        }
+
+        pub fn rotate_y(&self, r: f64) -> Mat4 {
+            self * Mat4::new_rotation_y(r)
+        }
+
+        pub fn rotate_z(&self, r: f64) -> Mat4 {
+            self * Mat4::new_rotation_z(r)
+        }
+
+        pub fn shear(&self, xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Mat4 {
+            self * Mat4::new_shearing(xy, xz, yx, yz, zx, zy)
         }
 
         pub fn submatrix(&self, row_to_exclude: usize, col_to_exclude: usize) -> Mat3 {
@@ -1241,7 +1265,7 @@ pub mod matrices {
 
         #[test]
         fn translation() {
-            let t = Mat4::translation(5.0, -3.0, 2.0);
+            let t = Mat4::new_translation(5.0, -3.0, 2.0);
             let t_inv = t.inverted();
             let p = Vec4::new_point(-3.0, 4.0, 5.0);
             let v = Vec4::new_vec(-3.0, 4.0, 5.0);
@@ -1254,7 +1278,7 @@ pub mod matrices {
 
         #[test]
         fn scale() {
-            let s = Mat4::scaling(2.0, 3.0, 4.0);
+            let s = Mat4::new_scaling(2.0, 3.0, 4.0);
             let s_inv = s.inverted();
             let p = Vec4::new_point(-4.0, 6.0, 8.0);
             let v = Vec4::new_vec(-4.0, 6.0, 8.0);
@@ -1267,44 +1291,44 @@ pub mod matrices {
         #[test]
         fn rotation_x() {
             let p = Vec4::new_point(0.0, 1.0, 0.0);
-            let half_quarter = Mat4::rotation_x(PI / 4.0);
+            let half_quarter = Mat4::new_rotation_x(PI / 4.0);
             let half_quarter_inv = half_quarter.inverted();
 
             assert_eq!(half_quarter_inv * p,
-                       Vec4::new_point(0.0, 2.0_f64.sqrt()/2.0, -(2.0_f64.sqrt()/2.0)));
+                       Vec4::new_point(0.0, 2.0_f64.sqrt() / 2.0, -(2.0_f64.sqrt() / 2.0)));
         }
 
         #[test]
         fn rotation_y() {
             let p = Vec4::new_point(0.0, 0.0, 1.0);
-            let half_quarter = Mat4::rotation_y(PI / 4.0);
-            let full_quarter = Mat4::rotation_y(PI / 2.0);
+            let half_quarter = Mat4::new_rotation_y(PI / 4.0);
+            let full_quarter = Mat4::new_rotation_y(PI / 2.0);
 
             assert_eq!(half_quarter * p,
-                       Vec4::new_point(2.0_f64.sqrt()/2.0, 0.0, 2.0_f64.sqrt()/2.0));
+                       Vec4::new_point(2.0_f64.sqrt() / 2.0, 0.0, 2.0_f64.sqrt() / 2.0));
             assert_eq!(full_quarter * p, Vec4::new_point(1.0, 0.0, 0.0));
         }
 
         #[test]
         fn rotation_z() {
             let p = Vec4::new_point(0.0, 1.0, 0.0);
-            let half_quarter = Mat4::rotation_z(PI / 4.0);
-            let full_quarter = Mat4::rotation_z(PI / 2.0);
+            let half_quarter = Mat4::new_rotation_z(PI / 4.0);
+            let full_quarter = Mat4::new_rotation_z(PI / 2.0);
 
             assert_eq!(half_quarter * p,
-                       Vec4::new_point(-(2.0_f64.sqrt()/2.0), 2.0_f64.sqrt()/2.0, 0.0));
+                       Vec4::new_point(-(2.0_f64.sqrt() / 2.0), 2.0_f64.sqrt() / 2.0, 0.0));
             assert_eq!(full_quarter * p, Vec4::new_point(-1.0, 0.0, 0.0));
         }
 
         #[test]
         fn shearing() {
             let p = Vec4::new_point(2.0, 3.0, 4.0);
-            let t_xy = Mat4::shearing(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-            let t_xz = Mat4::shearing(0.0, 1.0, 0.0, 0.0, 0.0, 0.0);
-            let t_yx = Mat4::shearing(0.0, 0.0, 1.0, 0.0, 0.0, 0.0);
-            let t_yz = Mat4::shearing(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
-            let t_zx = Mat4::shearing(0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-            let t_zy = Mat4::shearing(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+            let t_xy = Mat4::new_shearing(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            let t_xz = Mat4::new_shearing(0.0, 1.0, 0.0, 0.0, 0.0, 0.0);
+            let t_yx = Mat4::new_shearing(0.0, 0.0, 1.0, 0.0, 0.0, 0.0);
+            let t_yz = Mat4::new_shearing(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+            let t_zx = Mat4::new_shearing(0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+            let t_zy = Mat4::new_shearing(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
             assert_eq!(t_xy * p, Vec4::new_point(5.0, 3.0, 4.0));
             assert_eq!(t_xz * p, Vec4::new_point(6.0, 3.0, 4.0));
@@ -1312,6 +1336,19 @@ pub mod matrices {
             assert_eq!(t_yz * p, Vec4::new_point(2.0, 7.0, 4.0));
             assert_eq!(t_zx * p, Vec4::new_point(2.0, 3.0, 6.0));
             assert_eq!(t_zy * p, Vec4::new_point(2.0, 3.0, 7.0));
+        }
+
+        #[test]
+        fn fluent_api() {
+            let t = Mat4::id().
+                scale(2.0, 2.0, 1.0).
+                translate(10.0, 5.0, 7.0);
+
+            assert_eq!(t, Mat4::new([
+                [2.0, 0.0, 0.0, 20.0],
+                [0.0, 2.0, 0.0, 10.0],
+                [0.0, 0.0, 1.0, 7.0],
+                [0.0, 0.0, 0.0, 1.0]]));
         }
     }
 }
