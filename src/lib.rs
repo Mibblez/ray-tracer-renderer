@@ -103,6 +103,13 @@ pub mod ray_tracer_utilities {
             }
         }
 
+        pub fn equal_approx(&self, other: &Vec4) -> bool {
+            equal_approx(self.x, other.x) &&
+            equal_approx(self.y, other.y) &&
+            equal_approx(self.z, other.z) &&
+            equal_approx(self.w, other.w)
+        }
+
         pub fn magnitude(&self) -> f64 {
             (self.x.powf(2.0) + self.y.powf(2.0) + self.z.powf(2.0) + self.w.powf(2.0)).sqrt()
         }
@@ -775,9 +782,51 @@ pub mod matrices {
     impl Mat4 {
         pub fn id() -> Mat4 {
             Mat4::new([[1.0, 0.0, 0.0, 0.0],
-                          [0.0, 1.0, 0.0, 0.0],
-                          [0.0, 0.0, 1.0, 0.0],
-                          [0.0, 0.0, 0.0, 1.0]])
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn translation(x: f64, y: f64, z: f64) -> Mat4 {
+            Mat4::new([[1.0, 0.0, 0.0, x],
+                [0.0, 1.0, 0.0, y],
+                [0.0, 0.0, 1.0, z],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn scaling(x: f64, y: f64, z: f64) -> Mat4 {
+            Mat4::new([[x, 0.0, 0.0, 0.0],
+                [0.0, y, 0.0, 0.0],
+                [0.0, 0.0, z, 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn rotation_x(r: f64) -> Mat4 {
+            Mat4::new([[1.0, 0.0, 0.0, 0.0],
+                [0.0, r.cos(), -r.sin(), 0.0],
+                [0.0, r.sin(), r.cos(), 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn rotation_y(r: f64) -> Mat4 {
+            Mat4::new([[r.cos(), 0.0, r.sin(), 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [-r.sin(), 0.0, r.cos(), 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn rotation_z(r: f64) -> Mat4 {
+            Mat4::new([[r.cos(), -r.sin(), 0.0, 0.0],
+                [r.sin(), r.cos(), 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
+        }
+
+        pub fn shearing(xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Mat4 {
+            Mat4::new([[1.0, xy, xz, 0.0],
+                [yx, 1.0, yz, 0.0],
+                [zx, zy, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0]])
         }
 
         pub fn submatrix(&self, row_to_exclude: usize, col_to_exclude: usize) -> Mat3 {
@@ -797,9 +846,9 @@ pub mod matrices {
                 }
             }
 
-            Mat3::new([[m_values[0],m_values[1], m_values[2]],
-                             [m_values[3],m_values[4], m_values[5]],
-                             [m_values[6],m_values[7], m_values[8]]])
+            Mat3::new([[m_values[0], m_values[1], m_values[2]],
+                [m_values[3], m_values[4], m_values[5]],
+                [m_values[6], m_values[7], m_values[8]]])
         }
 
         pub fn minor(&self, row: usize, col: usize) -> f64 {
@@ -815,7 +864,7 @@ pub mod matrices {
         }
 
         pub fn determinant(&self) -> f64 {
-            self.data[0][0] * self.cofactor(0,0) +
+            self.data[0][0] * self.cofactor(0, 0) +
                 self.data[0][1] * self.cofactor(0, 1) +
                 self.data[0][2] * self.cofactor(0, 2) +
                 self.data[0][3] * self.cofactor(0, 3)
@@ -837,7 +886,6 @@ pub mod matrices {
 
             m_tmp
         }
-
     }
 
     impl Mat3 {
@@ -858,12 +906,12 @@ pub mod matrices {
                 }
             }
 
-            Mat2::new([[m_values[0],m_values[1]],
-                             [m_values[2],m_values[3]]])
+            Mat2::new([[m_values[0], m_values[1]],
+                [m_values[2], m_values[3]]])
         }
 
         pub fn minor(&self, row: usize, col: usize) -> f64 {
-            self.submatrix(row,col).determinant()
+            self.submatrix(row, col).determinant()
         }
 
         pub fn cofactor(&self, row: usize, col: usize) -> f64 {
@@ -875,7 +923,7 @@ pub mod matrices {
         }
 
         pub fn determinant(&self) -> f64 {
-            self.data[0][0] * self.cofactor(0,0) +
+            self.data[0][0] * self.cofactor(0, 0) +
                 self.data[0][1] * self.cofactor(0, 1) +
                 self.data[0][2] * self.cofactor(0, 2)
         }
@@ -1049,7 +1097,6 @@ pub mod matrices {
             // Inverting the identity matrix should produce the identity matrix
             let id = Mat4::id();
             assert_eq!(id, id.transposed());
-
         }
 
         #[test]
@@ -1060,7 +1107,7 @@ pub mod matrices {
                 [0.0, 6.0, -3.0]]);
 
             let a = Mat2::new([[-3.0, 2.0],
-                                            [0.0, 6.0]]);
+                [0.0, 6.0]]);
 
             let sub_m3 = m3.submatrix(0, 2);
 
@@ -1116,8 +1163,8 @@ pub mod matrices {
         #[test]
         fn determinant() {
             let a1 = Mat2::new([
-                                    [1.0, 5.0],
-                                    [-3.0, 2.0]]);
+                [1.0, 5.0],
+                [-3.0, 2.0]]);
 
             assert_eq!(a1.determinant(), 17.0);
 
@@ -1146,44 +1193,125 @@ pub mod matrices {
 
         #[test]
         fn inversion() {
-        let a = Mat4::new([
+            let a = Mat4::new([
                 [-5.0, 2.0, 6.0, -8.0],
                 [1.0, -5.0, 1.0, 8.0],
                 [7.0, 7.0, -6.0, -7.0],
                 [1.0, -3.0, 7.0, 4.0]]);
-        let a_inv = Mat4::new([
+            let a_inv = Mat4::new([
                 [0.21805, 0.45113, 0.24060, -0.04511],
                 [-0.80827, -1.45677, -0.44361, 0.52068],
                 [-0.07895, -0.22368, -0.05263, 0.19737],
                 [-0.52256, -0.81391, -0.30075, 0.30639]]);
-        let b = a.inverted();
+            let b = a.inverted();
 
-        assert_eq!(a.determinant(), 532.0);
+            assert_eq!(a.determinant(), 532.0);
 
-        assert_eq!(a.cofactor(2, 3), -160.0);
-        assert_eq!(b.data[3][2], -160.0/532.0);
-        assert_eq!(a.cofactor(3, 2), 105.0);
-        assert_eq!(b.data[2][3], 105.0/532.0);
+            assert_eq!(a.cofactor(2, 3), -160.0);
+            assert_eq!(b.data[3][2], -160.0 / 532.0);
+            assert_eq!(a.cofactor(3, 2), 105.0);
+            assert_eq!(b.data[2][3], 105.0 / 532.0);
 
-        assert_eq!(b.equal_approx(&a_inv), true);
+            assert_eq!(b.equal_approx(&a_inv), true);
         }
 
         #[test]
         fn inversion_multiplication() {
             let a = Mat4::new([
-                    [-3.0, 9.0, 7.0, 3.0],
-                    [3.0, -8.0, 2.0, -9.0],
-                    [-4.0, 4.0, 4.0, 1.0],
-                    [-6.0, 5.0, -1.0, 1.0]]);
+                [-3.0, 9.0, 7.0, 3.0],
+                [3.0, -8.0, 2.0, -9.0],
+                [-4.0, 4.0, 4.0, 1.0],
+                [-6.0, 5.0, -1.0, 1.0]]);
 
             let b = Mat4::new([
-                    [8.0, 2.0, 2.0, 2.0],
-                    [3.0, -1.0, 7.0, 0.0],
-                    [7.0, 0.0, 5.0, 4.0],
-                    [6.0, -2.0, 0.0, 5.0]]);
+                [8.0, 2.0, 2.0, 2.0],
+                [3.0, -1.0, 7.0, 0.0],
+                [7.0, 0.0, 5.0, 4.0],
+                [6.0, -2.0, 0.0, 5.0]]);
 
             let c = a * b;
             assert_eq!((c * b.inverted()).equal_approx(&a), true);
+        }
+    }
+
+    #[cfg(test)]
+    mod transforms {
+        use super::*;
+        use std::f64::consts::PI;
+
+        #[test]
+        fn translation() {
+            let t = Mat4::translation(5.0, -3.0, 2.0);
+            let t_inv = t.inverted();
+            let p = Vec4::new_point(-3.0, 4.0, 5.0);
+            let v = Vec4::new_vec(-3.0, 4.0, 5.0);
+
+            assert_eq!(t * p, Vec4::new_point(2.0, 1.0, 7.0));
+            assert_eq!(t_inv * p, Vec4::new_point(-8.0, 7.0, 3.0));
+            // Translation does not effect vectors
+            assert_eq!(t * v, v);
+        }
+
+        #[test]
+        fn scale() {
+            let s = Mat4::scaling(2.0, 3.0, 4.0);
+            let s_inv = s.inverted();
+            let p = Vec4::new_point(-4.0, 6.0, 8.0);
+            let v = Vec4::new_vec(-4.0, 6.0, 8.0);
+
+            assert_eq!(s * p, Vec4::new_point(-8.0, 18.0, 32.0));
+            assert_eq!(s * v, Vec4::new_vec(-8.0, 18.0, 32.0));
+            assert_eq!(s_inv * v, Vec4::new_vec(-2.0, 2.0, 2.0));
+        }
+
+        #[test]
+        fn rotation_x() {
+            let p = Vec4::new_point(0.0, 1.0, 0.0);
+            let half_quarter = Mat4::rotation_x(PI / 4.0);
+            let half_quarter_inv = half_quarter.inverted();
+
+            assert_eq!(half_quarter_inv * p,
+                       Vec4::new_point(0.0, 2.0_f64.sqrt()/2.0, -(2.0_f64.sqrt()/2.0)));
+        }
+
+        #[test]
+        fn rotation_y() {
+            let p = Vec4::new_point(0.0, 0.0, 1.0);
+            let half_quarter = Mat4::rotation_y(PI / 4.0);
+            let full_quarter = Mat4::rotation_y(PI / 2.0);
+
+            assert_eq!(half_quarter * p,
+                       Vec4::new_point(2.0_f64.sqrt()/2.0, 0.0, 2.0_f64.sqrt()/2.0));
+            assert_eq!(full_quarter * p, Vec4::new_point(1.0, 0.0, 0.0));
+        }
+
+        #[test]
+        fn rotation_z() {
+            let p = Vec4::new_point(0.0, 1.0, 0.0);
+            let half_quarter = Mat4::rotation_z(PI / 4.0);
+            let full_quarter = Mat4::rotation_z(PI / 2.0);
+
+            assert_eq!(half_quarter * p,
+                       Vec4::new_point(-(2.0_f64.sqrt()/2.0), 2.0_f64.sqrt()/2.0, 0.0));
+            assert_eq!(full_quarter * p, Vec4::new_point(-1.0, 0.0, 0.0));
+        }
+
+        #[test]
+        fn shearing() {
+            let p = Vec4::new_point(2.0, 3.0, 4.0);
+            let t_xy = Mat4::shearing(1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            let t_xz = Mat4::shearing(0.0, 1.0, 0.0, 0.0, 0.0, 0.0);
+            let t_yx = Mat4::shearing(0.0, 0.0, 1.0, 0.0, 0.0, 0.0);
+            let t_yz = Mat4::shearing(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+            let t_zx = Mat4::shearing(0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+            let t_zy = Mat4::shearing(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+
+            assert_eq!(t_xy * p, Vec4::new_point(5.0, 3.0, 4.0));
+            assert_eq!(t_xz * p, Vec4::new_point(6.0, 3.0, 4.0));
+            assert_eq!(t_yx * p, Vec4::new_point(2.0, 5.0, 4.0));
+            assert_eq!(t_yz * p, Vec4::new_point(2.0, 7.0, 4.0));
+            assert_eq!(t_zx * p, Vec4::new_point(2.0, 3.0, 6.0));
+            assert_eq!(t_zy * p, Vec4::new_point(2.0, 3.0, 7.0));
         }
     }
 }
