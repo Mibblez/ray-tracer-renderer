@@ -7,6 +7,7 @@ pub mod ray_tracer_utilities {
 
     use auto_ops::impl_op_ex;
 
+    // TODO: split vectors and points into separate structs
     #[derive(Copy, Clone, Debug)]
     pub struct Vec4 {
         pub x: f64,
@@ -1353,3 +1354,279 @@ pub mod matrices {
     }
 }
 
+pub mod rays {
+    use super::ray_tracer_utilities::*;
+
+    pub struct Ray {
+        pub origin: Vec4,
+        pub direction: Vec4,
+    }
+
+    impl Ray {
+        pub fn new_ray(origin: Vec4, direction: Vec4) -> Ray {
+            Ray { origin, direction }
+        }
+
+        pub fn position(&self, t: f64) -> Vec4 {
+            self.origin + (self.direction * t)
+        }
+    }
+
+    pub struct Sphere {
+        pub id: i32,
+    }
+
+    impl Sphere {
+        pub fn new_sphere(id: i32) -> Sphere {
+            Sphere { id }
+        }
+    }
+
+    pub enum Object<'a> {
+        Sphere(&'a Sphere),
+        SomeOtherObject,
+    }
+
+    pub struct Intersection<'a> {
+        pub t: f64,
+        pub object: Object<'a>,
+    }
+
+    impl Intersection<'_> {
+        pub fn new_intersection(t: f64, object: Object) -> Intersection {
+            Intersection { t, object }
+        }
+    }
+
+    //TODO: return an option for when there is no intersection
+    fn get_intersection<'a>(object: &'a Sphere, ray: &Ray) -> Vec<Intersection<'a>> {
+        let mut intersections: Vec<Intersection> = Vec::new();
+
+        // The vector from the sphere's center to the ray's origin
+        //FIXME: assuming the sphere has a radius of 1 and is located at the world origin
+        let sphere_to_ray = ray.origin - Vec4::new_point(0.0, 0.0, 0.0);
+
+        let a = ray.direction.dot(&ray.direction);
+        let b = 2.0 * ray.direction.dot(&sphere_to_ray);
+        let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
+
+        let discriminant = b.powi(2) - (4.0 * a) * c;
+
+        // If the discriminant is less than 0 then the ray does not intersect the sphere
+        if discriminant < 0.0 {
+            return intersections;
+        }
+
+
+        intersections.push(Intersection::new_intersection(
+            (-b - discriminant.sqrt()) / (2.0 * a),
+            Object::Sphere(object)));
+        intersections.push(Intersection::new_intersection(
+            (-b + discriminant.sqrt()) / (2.0 * a),
+            Object::Sphere(object)));
+
+        intersections
+    }
+
+    //TODO: make an object that holds a sorted list of intersections (or have it sortable on demand)
+    //TODO: sorted low to high based on t. Then impl get_hit on it. Maybe keep track of smallest_positive_t (updated on sort)
+     fn get_hit<'a>(intersections: &'a Vec<Intersection>) -> Option<&'a Intersection<'a>> {
+        let mut smallest_positive_t = f64::MAX;
+        let mut hit_tmp: Option<&Intersection> = None;
+
+        for intersection in intersections {
+            if intersection.t > 0.0 && intersection.t < smallest_positive_t {
+                hit_tmp = Some(intersection);
+                smallest_positive_t = intersection.t;
+            }
+        }
+
+        hit_tmp
+    }
+
+    //TODO: add method for aggregating intersections (page 64)
+
+    #[cfg(test)]
+    mod ray_tests {
+        use super::*;
+        use std::ptr;
+
+        #[test]
+        fn create_ray() {
+            let origin = Vec4::new_point(1.0, 2.0, 3.0);
+            let direction = Vec4::new_vec(4.0, 5.0, 6.0);
+
+            let r = Ray::new_ray(origin, direction);
+
+            assert_eq!(r.origin, origin);
+            assert_eq!(r.direction, direction);
+        }
+
+        #[test]
+        fn create_intersection() {
+            let s = Sphere::new_sphere(0);
+
+            let i = Intersection { t: 3.5, object: Object::Sphere(&s) };
+
+            assert_eq!(i.t, 3.5);
+
+            match i.object {
+                Object::Sphere(s) => assert_eq!(s.id, 0),
+                _ => panic!("Object should have been a sphere"),
+            }
+        }
+
+        #[test]
+        fn ray_distance() {
+            let r = Ray::new_ray(Vec4::new_point(2.0, 3.0, 4.0),
+                                 Vec4::new_vec(1.0, 0.0, 0.0));
+
+            assert_eq!(r.position(0.0), Vec4::new_point(2.0, 3.0, 4.0));
+            assert_eq!(r.position(1.0), Vec4::new_point(3.0, 3.0, 4.0));
+            assert_eq!(r.position(-1.0), Vec4::new_point(1.0, 3.0, 4.0));
+            assert_eq!(r.position(2.5), Vec4::new_point(4.5, 3.0, 4.0));
+        }
+
+        #[test]
+        fn ray_sphere_interception() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, 4.0);
+            assert_eq!(xs[1].t, 6.0);
+        }
+
+        #[test]
+        fn ray_sphere_tangent_interception() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 1.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, 5.0);
+            assert_eq!(xs[1].t, 5.0);
+        }
+
+        #[test]
+        fn ray_sphere_miss() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 2.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert!(xs.is_empty());
+        }
+
+        #[test]
+        fn ray_inside_sphere() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, 0.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, -1.0);
+            assert_eq!(xs[1].t, 1.0);
+        }
+
+        #[test]
+        fn sphere_behind_ray() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, 5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, -6.0);
+            assert_eq!(xs[1].t, -4.0);
+        }
+
+        #[test]
+        fn check_intersection_object() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let s = Sphere::new_sphere(0);
+
+            let xs = get_intersection(&s, &r);
+            assert_eq!(xs.len(), 2);
+
+            for i in xs {
+                match i.object {
+                    Object::Sphere(s) => assert_eq!(s.id, 0),
+                    _ => panic!("Object should have been a sphere"),
+                }
+            }
+        }
+
+        #[test]
+        fn hit_test_positive_t() {
+            let s = Sphere::new_sphere(0);
+
+            let i1 = Intersection::new_intersection(1.0, Object::Sphere(&s));
+            let i2 = Intersection::new_intersection(2.0, Object::Sphere(&s));
+            let xs = vec![i1, i2];
+
+            let i = get_hit(&xs).unwrap();
+
+            // i should point to xs[0] (which is i1)
+            assert!(ptr::eq(&xs[0], i));
+        }
+
+        #[test]
+        fn hit_test_some_negative_t() {
+            let s = Sphere::new_sphere(0);
+
+            let i1 = Intersection::new_intersection(-1.0, Object::Sphere(&s));
+            let i2 = Intersection::new_intersection(1.0, Object::Sphere(&s));
+            let xs = vec![i1, i2];
+
+            let i = get_hit(&xs).unwrap();
+
+            // i should point to xs[1] (which is i2)
+            assert!(ptr::eq(&xs[1], i));
+        }
+
+        #[test]
+        fn hit_test_negative_t() {
+            let s = Sphere::new_sphere(0);
+
+            let i1 = Intersection::new_intersection(-2.0, Object::Sphere(&s));
+            let i2 = Intersection::new_intersection(-1.0, Object::Sphere(&s));
+            let xs = vec![i1, i2];
+
+            let i = get_hit(&xs);
+
+            // There shouldn't be any intersections when t is negative
+            assert!(i.is_none());
+        }
+
+        #[test]
+        fn hit_unsorted_intersections() {
+            let s = Sphere::new_sphere(0);
+
+            let i1 = Intersection::new_intersection(5.0, Object::Sphere(&s));
+            let i2 = Intersection::new_intersection(7.0, Object::Sphere(&s));
+            let i3 = Intersection::new_intersection(-3.0, Object::Sphere(&s));
+            let i4 = Intersection::new_intersection(2.0, Object::Sphere(&s));
+            let xs = vec![i1, i2, i3, i4];
+
+            let i = get_hit(&xs).unwrap();
+
+            // i should point to xs[3] (which is i4)
+            assert!(ptr::eq(&xs[3], i));
+        }
+
+
+
+    }
+}
