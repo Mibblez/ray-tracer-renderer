@@ -34,7 +34,7 @@ fn projectile_arc() {
 	file.write_all(ppm.as_bytes()).expect("write failed");
 }
 
-fn draw_circle() {
+fn circle_outline() {
 	use std::f64::consts::PI;
 
 	let mut c = Canvas::new(400, 400, Color::new(0.0, 0.0, 0.0));
@@ -57,7 +57,7 @@ fn draw_circle() {
 	file.write_all(ppm.as_bytes()).expect("write failed");
 }
 
-fn draw_sphere() {
+fn draw_sphere_isometric() {
 	let mut c = Canvas::new(200, 200, Color::new(0.0, 0.0, 0.0));
 	let red = Color::new(255.0, 0.0, 0.0);
 
@@ -79,28 +79,59 @@ fn draw_sphere() {
 
 	let ppm = c.to_ppm();
 
-	let mut file = std::fs::File::create("sphere.ppm").expect("create failed");
+	let mut file = std::fs::File::create("sphere_iso.ppm").expect("create failed");
 	file.write_all(ppm.as_bytes()).expect("write failed");
-
-
 }
+
+fn draw_sphere_perspective() {
+	let canvas_size = 100;
+	let mut c = Canvas::new(canvas_size, canvas_size,
+							Color::new(0.0, 0.0, 0.0));
+	let red = Color::new(255.0, 0.0, 0.0);
+
+	let mut s = Sphere::new_sphere(0);
+
+	// Start the ray behind the sphere
+	let ray_origin = Vec4::new_point(0.0, 0.0, -10.0);
+
+	let wall_z = 10.0;		// Wall's Z distance from the origin
+	let wall_size = 7.0;	// X and Y size of the wall. The entire wall will be rendered
+	let half_wall_size = wall_size / 2.0;
+
+	// Size of a pixel in world units
+	let pixel_size = wall_size / canvas_size as f64;
+
+	for i in 0..c.width {
+		// Translate Y pixels to world units
+		let world_y = half_wall_size - pixel_size * i as f64;
+
+		for j in 0..c.height {
+			// Translate X pixels to world units
+			let world_x = -half_wall_size + pixel_size * j as f64;
+
+			// The point on the wall the ray will hit
+			let position = Vec4::new_point(world_x, world_y, wall_z);
+
+			// Cast a ray from the origin to that point
+			let r = Ray::new_ray(ray_origin, (position - ray_origin).normalized());
+
+			let xs = get_intersection(&s, &r);
+			if xs.len() != 0 {
+				c.write_pixel(i, j, &red);
+			}
+		}
+	}
+
+	let ppm = c.to_ppm();
+
+	let mut file = std::fs::File::create("sphere_perspective.ppm").expect("create failed");
+	file.write_all(ppm.as_bytes()).expect("write failed");
+}
+
 
 fn main() {
-	projectile_arc();
-	draw_circle();
-	draw_sphere()
+	//projectile_arc();
+	circle_outline();
+	draw_sphere_isometric();
+	draw_sphere_perspective();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
