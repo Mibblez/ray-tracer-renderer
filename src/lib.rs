@@ -1356,7 +1356,9 @@ pub mod matrices {
 
 pub mod rays {
     use super::ray_tracer_utilities::*;
+    use super::matrices::Mat4;
 
+    //#[derive(Copy, Clone, Debug)]
     pub struct Ray {
         pub origin: Vec4,
         pub direction: Vec4,
@@ -1370,15 +1372,28 @@ pub mod rays {
         pub fn position(&self, t: f64) -> Vec4 {
             self.origin + (self.direction * t)
         }
+
+        pub fn transform(&self, mat: Mat4) -> Ray {
+            Ray::new_ray(mat * self.origin, mat * self.direction)
+
+
+            // Ray::new_ray(Vec4::new_point(1.0, 2.0, 3.0),
+            //              Vec4::new_vec(0.0, 1.0, 0.0))
+        }
     }
 
     pub struct Sphere {
+        pub transform: Mat4,
         pub id: i32,
     }
 
     impl Sphere {
         pub fn new_sphere(id: i32) -> Sphere {
-            Sphere { id }
+            Sphere { id, transform: Mat4::id()}
+        }
+
+        pub fn set_transform(&mut self, mat: Mat4) {
+            self.transform = mat;
         }
     }
 
@@ -1399,11 +1414,13 @@ pub mod rays {
     }
 
     //TODO: return an option for when there is no intersection
-    fn get_intersection<'a>(object: &'a Sphere, ray: &Ray) -> Vec<Intersection<'a>> {
+    pub fn get_intersection<'a>(object: &'a Sphere, ray: &Ray) -> Vec<Intersection<'a>> {
+        // Apply the sphere's transform to the ray
+        let ray = ray.transform(object.transform.inverted());
+
         let mut intersections: Vec<Intersection> = Vec::new();
 
         // The vector from the sphere's center to the ray's origin
-        //FIXME: assuming the sphere has a radius of 1 and is located at the world origin
         let sphere_to_ray = ray.origin - Vec4::new_point(0.0, 0.0, 0.0);
 
         let a = ray.direction.dot(&ray.direction);
@@ -1417,7 +1434,6 @@ pub mod rays {
             return intersections;
         }
 
-
         intersections.push(Intersection::new_intersection(
             (-b - discriminant.sqrt()) / (2.0 * a),
             Object::Sphere(object)));
@@ -1430,7 +1446,7 @@ pub mod rays {
 
     //TODO: make an object that holds a sorted list of intersections (or have it sortable on demand)
     //TODO: sorted low to high based on t. Then impl get_hit on it. Maybe keep track of smallest_positive_t (updated on sort)
-     fn get_hit<'a>(intersections: &'a Vec<Intersection>) -> Option<&'a Intersection<'a>> {
+    fn get_hit<'a>(intersections: &'a Vec<Intersection>) -> Option<&'a Intersection<'a>> {
         let mut smallest_positive_t = f64::MAX;
         let mut hit_tmp: Option<&Intersection> = None;
 
@@ -1450,6 +1466,7 @@ pub mod rays {
     mod ray_tests {
         use super::*;
         use std::ptr;
+        //use super::matrices::Mat4;
 
         #[test]
         fn create_ray() {
@@ -1626,7 +1643,72 @@ pub mod rays {
             assert!(ptr::eq(&xs[3], i));
         }
 
+        #[test]
+        fn ray_translation() {
+            let r = Ray::new_ray(Vec4::new_point(1.0, 2.0, 3.0),
+                                 Vec4::new_vec(0.0, 1.0, 0.0));
+            let m = Mat4::new_translation(3.0, 4.0, 5.0);
 
+            let r2 = r.transform(m);
 
+            assert_eq!(r2.origin, Vec4::new_point(4.0, 6.0, 8.0));
+            assert_eq!(r2.direction, Vec4::new_vec(0.0, 1.0, 0.0));
+        }
+
+        #[test]
+        fn ray_scaling() {
+            let r = Ray::new_ray(Vec4::new_point(1.0, 2.0, 3.0),
+                                 Vec4::new_vec(0.0, 1.0, 0.0));
+            let m = Mat4::new_scaling(2.0, 3.0, 4.0);
+
+            let r2 = r.transform(m);
+
+            assert_eq!(r2.origin, Vec4::new_point(2.0, 6.0, 12.0));
+            assert_eq!(r2.direction, Vec4::new_vec(0.0, 3.0, 0.0));
+        }
+
+        #[test]
+        fn default_sphere() {
+            let s = Sphere::new_sphere(0);
+            assert_eq!(s.transform, Mat4::id());
+        }
+
+        #[test]
+        fn transform_sphere() {
+            let mut s = Sphere::new_sphere(0);
+            let t = Mat4::new_translation(2.0, 3.0, 4.0);
+
+            s.set_transform(t);
+
+            assert_eq!(s.transform, Mat4::new_translation(2.0, 3.0, 4.0));
+        }
+
+        #[test]
+        fn scaled_sphere_intersection() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let mut s = Sphere::new_sphere(0);
+            s.set_transform(Mat4::new_scaling(2.0, 2.0, 2.0));
+
+            let xs = get_intersection(&s, &r);
+
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, 3.0);
+            assert_eq!(xs[1].t, 7.0);
+        }
+
+        #[test]
+        fn translated_sphere_intersection() {
+            let r = Ray::new_ray(Vec4::new_point(0.0, 0.0, -5.0),
+                                 Vec4::new_vec(0.0, 0.0, 1.0));
+
+            let mut s = Sphere::new_sphere(0);
+            s.set_transform(Mat4::new_translation(5.0, 0.0, 0.0));
+
+            let xs = get_intersection(&s, &r);
+
+            assert_eq!(xs.len(), 0);
+        }
     }
 }

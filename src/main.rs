@@ -2,8 +2,10 @@ mod lib;
 
 pub use crate::lib::ray_tracer_utilities::*;
 pub use crate::lib::matrices::*;
+pub use crate::lib::rays::*;
 
 use std::io::Write;
+use crate::get_intersection;
 
 fn projectile_arc() {
 	let start = Vec4::new_point(0.0, 1.0, 0.0);
@@ -55,9 +57,38 @@ fn draw_circle() {
 	file.write_all(ppm.as_bytes()).expect("write failed");
 }
 
+fn draw_sphere() {
+	let mut c = Canvas::new(200, 200, Color::new(0.0, 0.0, 0.0));
+	let red = Color::new(255.0, 0.0, 0.0);
+
+	let mut s = Sphere::new_sphere(0);
+
+	s.set_transform(Mat4::id().translate(75.0, 75.0, 0.0).scale(8.0, 8.0, 1.0));
+
+	for i in 0..c.width {
+		for j in 0..c.height {
+			let r = Ray::new_ray(Vec4::new_point(i as f64, j as f64, 0.0),
+			Vec4::new_vec(0.0, 0.0, 1.0));
+
+			let xs = get_intersection(&s, &r);
+			if xs.len() != 0 {
+				c.write_pixel(i, j, &red);
+			}
+		}
+	}
+
+	let ppm = c.to_ppm();
+
+	let mut file = std::fs::File::create("sphere.ppm").expect("create failed");
+	file.write_all(ppm.as_bytes()).expect("write failed");
+
+
+}
+
 fn main() {
 	projectile_arc();
 	draw_circle();
+	draw_sphere()
 }
 
 
