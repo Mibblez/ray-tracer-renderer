@@ -1,11 +1,10 @@
-mod lib;
+mod ray_tracer;
 
-pub use crate::lib::ray_tracer_utilities::*;
-pub use crate::lib::matrices::*;
-pub use crate::lib::rays::*;
+pub use crate::ray_tracer::rt_prelude::*;
+pub use crate::ray_tracer::matrices::*;
+pub use crate::ray_tracer::rays::*;
 
 use std::io::Write;
-use crate::get_intersection;
 
 fn projectile_arc() {
 	let start = Vec4::new_point(0.0, 1.0, 0.0);
@@ -89,7 +88,7 @@ fn draw_sphere_perspective() {
 							Color::new(0.0, 0.0, 0.0));
 	let red = Color::new(255.0, 0.0, 0.0);
 
-	let mut s = Sphere::new_sphere(0);
+	let s = Sphere::new_sphere(0);
 
 	// Start the ray behind the sphere
 	let ray_origin = Vec4::new_point(0.0, 0.0, -10.0);
@@ -130,7 +129,7 @@ fn draw_sphere_perspective() {
 
 
 fn main() {
-	//projectile_arc();
+	projectile_arc();
 	circle_outline();
 	draw_sphere_isometric();
 	draw_sphere_perspective();

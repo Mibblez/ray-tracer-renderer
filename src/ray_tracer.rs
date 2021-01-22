@@ -1,4 +1,4 @@
-pub mod ray_tracer_utilities {
+pub mod rt_prelude {
     use std::ops::Neg;
     use std::marker::Copy;
     use std::clone::Clone;
@@ -689,9 +689,9 @@ pub mod ray_tracer_utilities {
 
 pub mod matrices {
     use auto_ops::impl_op_ex;
-    use super::ray_tracer_utilities::Vec4;
+    use super::rt_prelude::Vec4;
     use std::ops::Neg;
-    use super::ray_tracer_utilities::equal_approx;
+    use super::rt_prelude::equal_approx;
 
     macro_rules! build_mat {
         ($mat_name:ident, $size:expr) => (
@@ -895,21 +895,21 @@ pub mod matrices {
                 self.data[0][3] * self.cofactor(0, 3)
         }
 
-        pub fn inverted(&self) -> Mat4 {
+        pub fn inverted(&self) -> Option<Mat4> {
             let det = self.determinant();
+
             if det == 0.0 {
-                // TODO: better error handling
-                panic!("matrix has a determinant of 0. It cannot be inverted");
-            }
-
-            let mut m_tmp = Mat4::zeros();
-            for row in 0..4 {
-                for col in 0..4 {
-                    m_tmp.data[col][row] = self.cofactor(row, col) / det;
+                None
+            } else {
+                let mut m_tmp = Mat4::zeros();
+                for row in 0..4 {
+                    for col in 0..4 {
+                        m_tmp.data[col][row] = self.cofactor(row, col) / det;
+                    }
                 }
-            }
 
-            m_tmp
+                Some(m_tmp)
+            }
         }
     }
 
@@ -1228,7 +1228,7 @@ pub mod matrices {
                 [-0.80827, -1.45677, -0.44361, 0.52068],
                 [-0.07895, -0.22368, -0.05263, 0.19737],
                 [-0.52256, -0.81391, -0.30075, 0.30639]]);
-            let b = a.inverted();
+            let b = a.inverted().unwrap();
 
             assert_eq!(a.determinant(), 532.0);
 
@@ -1255,7 +1255,8 @@ pub mod matrices {
                 [6.0, -2.0, 0.0, 5.0]]);
 
             let c = a * b;
-            assert_eq!((c * b.inverted()).equal_approx(&a), true);
+            let b_inv = b.inverted().unwrap();
+            assert_eq!((c * b_inv).equal_approx(&a), true);
         }
     }
 
@@ -1267,7 +1268,7 @@ pub mod matrices {
         #[test]
         fn translation() {
             let t = Mat4::new_translation(5.0, -3.0, 2.0);
-            let t_inv = t.inverted();
+            let t_inv = t.inverted().unwrap();
             let p = Vec4::new_point(-3.0, 4.0, 5.0);
             let v = Vec4::new_vec(-3.0, 4.0, 5.0);
 
@@ -1280,7 +1281,7 @@ pub mod matrices {
         #[test]
         fn scale() {
             let s = Mat4::new_scaling(2.0, 3.0, 4.0);
-            let s_inv = s.inverted();
+            let s_inv = s.inverted().unwrap();
             let p = Vec4::new_point(-4.0, 6.0, 8.0);
             let v = Vec4::new_vec(-4.0, 6.0, 8.0);
 
@@ -1293,7 +1294,7 @@ pub mod matrices {
         fn rotation_x() {
             let p = Vec4::new_point(0.0, 1.0, 0.0);
             let half_quarter = Mat4::new_rotation_x(PI / 4.0);
-            let half_quarter_inv = half_quarter.inverted();
+            let half_quarter_inv = half_quarter.inverted().unwrap();
 
             assert_eq!(half_quarter_inv * p,
                        Vec4::new_point(0.0, 2.0_f64.sqrt() / 2.0, -(2.0_f64.sqrt() / 2.0)));
@@ -1355,10 +1356,9 @@ pub mod matrices {
 }
 
 pub mod rays {
-    use super::ray_tracer_utilities::*;
+    use super::rt_prelude::Vec4;
     use super::matrices::Mat4;
 
-    //#[derive(Copy, Clone, Debug)]
     pub struct Ray {
         pub origin: Vec4,
         pub direction: Vec4,
@@ -1375,10 +1375,6 @@ pub mod rays {
 
         pub fn transform(&self, mat: Mat4) -> Ray {
             Ray::new_ray(mat * self.origin, mat * self.direction)
-
-
-            // Ray::new_ray(Vec4::new_point(1.0, 2.0, 3.0),
-            //              Vec4::new_vec(0.0, 1.0, 0.0))
         }
     }
 
@@ -1413,12 +1409,19 @@ pub mod rays {
         }
     }
 
-    //TODO: return an option for when there is no intersection
+    // TODO: quietly fails and returns an empty Vec if object's matrix cannot be inverted
+    // TODO: maybe make a special "Transform" struct for functions like this. Traits would help here or Transform.as_mat4
     pub fn get_intersection<'a>(object: &'a Sphere, ray: &Ray) -> Vec<Intersection<'a>> {
-        // Apply the sphere's transform to the ray
-        let ray = ray.transform(object.transform.inverted());
-
         let mut intersections: Vec<Intersection> = Vec::new();
+
+        let object_transform_inverted = object.transform.inverted();
+        if object_transform_inverted == None {
+            return intersections;
+        }
+        let object_transform_inverted = object_transform_inverted.unwrap();
+
+        // Apply the sphere's transform to the ray
+        let ray = ray.transform(object_transform_inverted);
 
         // The vector from the sphere's center to the ray's origin
         let sphere_to_ray = ray.origin - Vec4::new_point(0.0, 0.0, 0.0);
@@ -1431,27 +1434,25 @@ pub mod rays {
 
         // If the discriminant is less than 0 then the ray does not intersect the sphere
         if discriminant < 0.0 {
-            return intersections;
+            intersections
+        } else {
+            intersections.push(Intersection::new_intersection(
+                (-b - discriminant.sqrt()) / (2.0 * a),
+                Object::Sphere(object)));
+            intersections.push(Intersection::new_intersection(
+                (-b + discriminant.sqrt()) / (2.0 * a),
+                Object::Sphere(object)));
+
+            intersections
         }
-
-        intersections.push(Intersection::new_intersection(
-            (-b - discriminant.sqrt()) / (2.0 * a),
-            Object::Sphere(object)));
-        intersections.push(Intersection::new_intersection(
-            (-b + discriminant.sqrt()) / (2.0 * a),
-            Object::Sphere(object)));
-
-        intersections
     }
 
-    //TODO: make an object that holds a sorted list of intersections (or have it sortable on demand)
-    //TODO: sorted low to high based on t. Then impl get_hit on it. Maybe keep track of smallest_positive_t (updated on sort)
     fn get_hit<'a>(intersections: &'a Vec<Intersection>) -> Option<&'a Intersection<'a>> {
         let mut smallest_positive_t = f64::MAX;
         let mut hit_tmp: Option<&Intersection> = None;
 
         for intersection in intersections {
-            if intersection.t > 0.0 && intersection.t < smallest_positive_t {
+            if intersection.t.is_sign_positive() && intersection.t < smallest_positive_t {
                 hit_tmp = Some(intersection);
                 smallest_positive_t = intersection.t;
             }
@@ -1460,13 +1461,10 @@ pub mod rays {
         hit_tmp
     }
 
-    //TODO: add method for aggregating intersections (page 64)
-
     #[cfg(test)]
     mod ray_tests {
         use super::*;
         use std::ptr;
-        //use super::matrices::Mat4;
 
         #[test]
         fn create_ray() {
